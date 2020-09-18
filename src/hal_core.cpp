@@ -16,8 +16,6 @@
 #include "hal_palette.h"
 #include "log.h"
 
-#define IPU_SCALING 1
-
 //static SDL_Window* sdlWin = nullptr;
 //static SDL_Renderer* sdlRen = nullptr;
 //static SDL_Texture* sdlTex = nullptr;

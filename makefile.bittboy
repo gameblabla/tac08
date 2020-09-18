@@ -17,7 +17,7 @@ CXXFLAGS_RELEASE = -O3 -Wall -c -std=c++11 $(SDL_INCLUDE) -I$(UTF8_UTIL_BASE) $(
 
 CXXFLAGS = $(CXXFLAGS_RELEASE)
 
-LDFLAGS = -lc -lgcc $(SDL_LIB) $(LUA_LIB) -lz
+LDFLAGS = -lc -lgcc $(SDL_LIB) $(LUA_LIB) -lasound -lz
 EXE = tac08
 
 all: $(EXE)
