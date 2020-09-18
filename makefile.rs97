@@ -13,11 +13,14 @@ UTF8_UTIL_BASE = src/utf8-util/utf8-util
 DEFINES = -DTAC08_PLATFORM=PLATFORM_DESKTOP_LINUX -DIPU_SCALING
 
 CXXFLAGS_DEBUG = -DDEBUG -Wall -c -std=c++11 $(SDL_INCLUDE) -I$(UTF8_UTIL_BASE) $(DEFINES)
-CXXFLAGS_RELEASE = -O3 -Wall -c -std=c++11 $(SDL_INCLUDE) -I$(UTF8_UTIL_BASE) $(DEFINES)
+CXXFLAGS_RELEASE = -Ofast -fdata-sections -ffunction-sections -mno-fp-exceptions -mno-check-zero-division -mframe-header-opt -fsingle-precision-constant -fno-common -mxgot -mips32 -mno-mips16 -fno-PIC -mno-abicalls -flto
+
+CXXFLAGS_RELEASE += -Wall -c -std=c++11 $(SDL_INCLUDE) -I$(UTF8_UTIL_BASE) $(DEFINES)
 
 CXXFLAGS = $(CXXFLAGS_RELEASE)
 
-LDFLAGS = -lc -lgcc $(SDL_LIB) $(LUA_LIB) -lz
+LDFLAGS = -lc -lgcc -lstdc++ -lSDL $(LUA_LIB) -lz -no-pie -Wl,--as-needed -Wl,--gc-sections -flto -s
+
 EXE = tac08
 
 all: $(EXE)

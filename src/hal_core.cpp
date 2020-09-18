@@ -448,6 +448,12 @@ bool INP_ProcessInputEvents(const SDL_Event& ev) {
 			}
 		}
 	}*/
+	
+	if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_3) {
+		GFX_ToggleFullScreen();
+		return true;
+	}
+	
 	if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_F11) {
 		GFX_ToggleFullScreen();
 		return true;
@@ -509,6 +515,13 @@ bool INP_ProcessInputEvents(const SDL_Event& ev) {
 
 bool EVT_ProcessEvents() {
 	SDL_Event e;
+	Uint8 *keystate = SDL_GetKeyState(NULL);
+	
+	if (keystate[SDLK_RETURN] && keystate[SDLK_ESCAPE])
+	{
+		return false;	
+	}
+	
 	while (SDL_PollEvent(&e)) {
 		if (e.type == SDL_QUIT) {
 			return false;
