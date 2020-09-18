@@ -1,23 +1,23 @@
-CXX = g++
+CXX = /opt/rs97-toolchain/usr/bin/mipsel-linux-g++
 
 # modify these paths to point to your local sdl install. 
 SDL_PATH_LIB = /usr/lib
 SDL_PATH_INC = /usr/include
 
-SDL_LIB = -L$(SDL_PATH_LIB) -lSDL
-SDL_INCLUDE = -I$(SDL_PATH_LIB)
+SDL_LIB = -lSDL 
+SDL_INCLUDE =
 
 LUA_LIB =  -Lsrc/z8lua -lluaz8 
 UTF8_UTIL_BASE = src/utf8-util/utf8-util
 
 DEFINES = -DTAC08_PLATFORM=PLATFORM_DESKTOP_LINUX
 
-CXXFLAGS_DEBUG = -DDEBUG -ggdb -Wall -c -std=c++11 $(SDL_INCLUDE) -I$(UTF8_UTIL_BASE) $(DEFINES)
-CXXFLAGS_RELEASE = -O3 -ggdb -Wall -c -std=c++11 $(SDL_INCLUDE) -I$(UTF8_UTIL_BASE) $(DEFINES)
+CXXFLAGS_DEBUG = -DDEBUG -Wall -c -std=c++11 $(SDL_INCLUDE) -I$(UTF8_UTIL_BASE) $(DEFINES)
+CXXFLAGS_RELEASE = -O3 -Wall -c -std=c++11 $(SDL_INCLUDE) -I$(UTF8_UTIL_BASE) $(DEFINES)
 
 CXXFLAGS = $(CXXFLAGS_RELEASE)
 
-LDFLAGS = $(SDL_LIB) $(LUA_LIB)  
+LDFLAGS = -lc -lgcc $(SDL_LIB) $(LUA_LIB) -lz
 EXE = tac08
 
 all: $(EXE)

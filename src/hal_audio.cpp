@@ -1,5 +1,5 @@
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_audio.h>
+#include <SDL/SDL.h>
+#include <SDL/SDL_audio.h>
 
 #include <stdint.h>
 #include <algorithm>
@@ -31,7 +31,8 @@ struct Channel {
 };
 
 std::vector<Wav> loadedWavs;
-SDL_AudioDeviceID audioDevice = 0;
+//SDL_AudioDeviceID audioDevice = 0;
+SDL_AudioSpec *hardware_spec;
 std::array<Channel, NUM_CHANNELS> channels;
 
 static void throw_error(std::string msg) {
@@ -81,7 +82,7 @@ void AUDIO_Init() {
 		throw_error("SDL_Init Error: ");
 	}
 
-	SDL_AudioSpec spec, gotspec;
+	/*SDL_AudioSpec spec, gotspec;
 	SDL_zero(spec);
 	spec.freq = config::AUDIO_FREQ;
 	spec.format = AUDIO_S16LSB;
@@ -92,13 +93,36 @@ void AUDIO_Init() {
 	if (audioDevice == 0) {
 		throw_error("SDL_OpenAudioDevice error: ");
 	}
-	SDL_PauseAudioDevice(audioDevice, 0);
+	SDL_PauseAudioDevice(audioDevice, 0);*/
+	SDL_AudioSpec *spec, *gotspec;
+	/* Allocate a desired SDL_AudioSpec */
+	spec = (SDL_AudioSpec*)malloc(sizeof(SDL_AudioSpec));
+
+	/* Allocate space for the obtained SDL_AudioSpec */
+	gotspec = (SDL_AudioSpec*)malloc(sizeof(SDL_AudioSpec));
+	//SDL_zero(spec);
+	spec->freq = config::AUDIO_FREQ;
+	spec->format = AUDIO_S16LSB;
+	spec->channels = 1;
+	spec->samples = config::AUDIO_BUFFER_SIZE;
+	spec->callback = callback;
+	/* Open the audio device */
+	if ( SDL_OpenAudio(spec, gotspec) < 0 ){
+	  fprintf(stderr, "Couldn't open audio: %s\n", SDL_GetError());
+	  exit(-1);
+	}
+	free(gotspec);
+	hardware_spec=gotspec;
+	/* Start playing */
+	SDL_PauseAudio(0);
 }
 
 void AUDIO_Shutdown() {
 	TraceFunction();
-	SDL_PauseAudioDevice(audioDevice, 1);
-	SDL_CloseAudioDevice(audioDevice);
+	//SDL_PauseAudioDevice(audioDevice, 1);
+	//SDL_CloseAudioDevice(audioDevice);
+	SDL_PauseAudio(1);
+	SDL_CloseAudio();
 
 	for (auto& wav : loadedWavs) {
 		SDL_FreeWAV((uint8_t*)(wav.sampleData));
@@ -118,9 +142,10 @@ static uint32_t trim_sample(int16_t* sampleData, uint32_t numSamples) {
 
 int AUDIO_LoadWav(const char* name, bool trim) {
 	Wav wav;
-	SDL_zero(wav);
+	//SDL_zero(wav);
 
 	if (SDL_LoadWAV(name, &wav.spec, (uint8_t**)&wav.sampleData, &wav.numSamples) == nullptr) {
+		printf("No wav %s\n", name);
 		throw_error("SDL_LoadWav error: ");
 	}
 
@@ -130,9 +155,11 @@ int AUDIO_LoadWav(const char* name, bool trim) {
 		wav.numSamples = trim_sample(wav.sampleData, wav.numSamples);
 	}
 
-	SDL_LockAudioDevice(audioDevice);
+	//SDL_LockAudio();
+	SDL_LockAudio();
 	loadedWavs.push_back(wav);
-	SDL_UnlockAudioDevice(audioDevice);
+	SDL_UnlockAudio();
+	//SDL_UnlockAudio();
 
 	int id = loadedWavs.size() - 1;
 
@@ -158,9 +185,9 @@ void AUDIO_Play(int id, int chan, bool loop) {
 	ci.loop_end = ci.end;
 	ci.current = ci.start;
 
-	SDL_LockAudioDevice(audioDevice);
+	SDL_LockAudio();
 	channels[chan] = ci;
-	SDL_UnlockAudioDevice(audioDevice);
+	SDL_UnlockAudio();
 }
 
 // convert a position in a sample (128th of a second) to a sample index
@@ -183,9 +210,9 @@ void AUDIO_Play(int id, int chan, int start, int end, bool loop) {
 	ci.loop_end = ci.end;
 	ci.current = ci.start;
 
-	SDL_LockAudioDevice(audioDevice);
+	SDL_LockAudio();
 	channels[chan] = ci;
-	SDL_UnlockAudioDevice(audioDevice);
+	SDL_UnlockAudio();
 }
 
 void AUDIO_Play(int id, int chan, int loop_start, int loop_end) {
@@ -203,9 +230,9 @@ void AUDIO_Play(int id, int chan, int loop_start, int loop_end) {
 	ci.loop_end = std::min(pos2sample(loop_end, ci.wav.spec.freq), ci.end);
 	ci.current = ci.start;
 
-	SDL_LockAudioDevice(audioDevice);
+	SDL_LockAudio();
 	channels[chan] = ci;
-	SDL_UnlockAudioDevice(audioDevice);
+	SDL_UnlockAudio();
 }
 
 void AUDIO_StopAll() {
@@ -215,21 +242,21 @@ void AUDIO_StopAll() {
 }
 
 void AUDIO_Stop(int chan) {
-	SDL_LockAudioDevice(audioDevice);
+	SDL_LockAudio();
 	channels[chan].playing = false;
-	SDL_UnlockAudioDevice(audioDevice);
+	SDL_UnlockAudio();
 }
 
 void AUDIO_StopLoop(int chan) {
-	SDL_LockAudioDevice(audioDevice);
+	SDL_LockAudio();
 	channels[chan].loop = false;
-	SDL_UnlockAudioDevice(audioDevice);
+	SDL_UnlockAudio();
 }
 
 bool AUDIO_isPlaying(int chan) {
-	SDL_LockAudioDevice(audioDevice);
+	SDL_LockAudio();
 	bool playing = channels[chan].playing;
-	SDL_UnlockAudioDevice(audioDevice);
+	SDL_UnlockAudio();
 	return playing;
 }
 

@@ -3,6 +3,10 @@
 
 #include <string>
 
+#ifndef PATH_MAX
+#define PATH_MAX 2048
+#endif
+
 namespace hal_fs {
 	struct finfo {
 		std::string name;

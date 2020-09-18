@@ -1,7 +1,7 @@
 #include "pico_script.h"
 
 #include <assert.h>
-
+#include <stdint.h>
 #include <cstring>
 #include <deque>
 #include <functional>
@@ -714,7 +714,7 @@ static int impl_ord(lua_State* ls) {
 	DEBUG_DUMP_FUNCTION
 	const char* msg = luaL_checkstring(lstate, 1);
 	if (msg && strlen(msg)) {
-		lua_pushnumber(ls, (uint)msg[0]);
+		lua_pushnumber(ls, (uint32_t)msg[0]);
 		return 1;
 	}
 	return 0;

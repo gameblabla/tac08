@@ -1,6 +1,5 @@
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_clipboard.h>
-#include <SDL2/SDL_rwops.h>
+#include <SDL/SDL.h>
+#include <SDL/SDL_rwops.h>
 #include <assert.h>
 
 #include <algorithm>
@@ -17,13 +16,18 @@
 #include "hal_palette.h"
 #include "log.h"
 
-static SDL_Window* sdlWin = nullptr;
-static SDL_Renderer* sdlRen = nullptr;
-static SDL_Texture* sdlTex = nullptr;
+#define IPU_SCALING 1
+
+//static SDL_Window* sdlWin = nullptr;
+//static SDL_Renderer* sdlRen = nullptr;
+//static SDL_Texture* sdlTex = nullptr;
 static SDL_PixelFormat* sdlPixFmt = nullptr;
 static SDL_Joystick* joystick = nullptr;
 static int screenWidth = config::INIT_SCREEN_WIDTH;
 static int screenHeight = config::INIT_SCREEN_HEIGHT;
+
+static SDL_Surface* screen;
+static SDL_Surface* sdlTex;
 
 static std::array<pixel_t, 256> original_palette;
 static std::array<pixel_t, 256> palette;
@@ -32,7 +36,7 @@ static bool debug_trace_state = false;
 static bool reload_requested = false;
 static std::string selectedPalette;
 
-static SDL_Point zoom_origin = SDL_Point{64, 64};
+//static SDL_Point zoom_origin = SDL_Point{64, 64};
 static double zoom_factor = 1.0;
 static double zoom_rot = 0.0;
 
@@ -42,7 +46,7 @@ static void throw_error(std::string msg) {
 }
 
 void SYSLOG_LogMessage(LogLevel l, const char* msg) {
-	switch (l) {
+	/*switch (l) {
 		case LogLevel::info:
 			SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "DEBUG: %s", msg);
 			break;
@@ -58,7 +62,7 @@ void SYSLOG_LogMessage(LogLevel l, const char* msg) {
 		case LogLevel::apitrace:
 			SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "  API: %s", msg);
 			break;
-	}
+	}*/
 }
 
 void GFX_Init(int x, int y) {
@@ -75,7 +79,7 @@ void GFX_Init(int x, int y) {
 		throw_error("SDL_Init Error: ");
 	}
 
-	int window_flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
+	/*int window_flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
 #ifdef TAC08_FULL_SCREEN
 	window_flags = window_flags | SDL_WINDOW_FULLSCREEN;
 #endif
@@ -88,7 +92,13 @@ void GFX_Init(int x, int y) {
 	sdlRen = SDL_CreateRenderer(sdlWin, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 	if (sdlRen == nullptr) {
 		throw_error("SDL_CreateRenderer Error: ");
-	}
+	}*/
+	
+#ifdef IPU_SCALING
+	screen = SDL_SetVideoMode(128, 128, 16, SDL_HWSURFACE);
+#else
+	screen = SDL_SetVideoMode(320, 240, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+#endif
 	SDL_ShowCursor(SDL_DISABLE);
 
 	int joystick_index = -1;
@@ -102,7 +112,7 @@ void GFX_Init(int x, int y) {
 		}
 
 		logr << "Joystick: " << n;
-		logr << "  name: " << SDL_JoystickName(js);
+		logr << "  name: " << SDL_JoystickName(n);
 		logr << "  buttons: " << SDL_JoystickNumButtons(js);
 		logr << "  axis: " << SDL_JoystickNumAxes(js);
 		logr << "  hats: " << SDL_JoystickNumHats(js);
@@ -116,24 +126,32 @@ void GFX_Init(int x, int y) {
 		}
 	}
 
-	int num = SDL_GetNumTouchDevices();
-	logr << "num touch devices: " << num;
+	/*int num = SDL_GetNumTouchDevices();
+	logr << "num touch devices: " << num;*/
 }
 
 void GFX_End() {
 	TraceFunction();
-	if (sdlRen) {
+	/*if (sdlRen) {
 		SDL_DestroyRenderer(sdlRen);
 	}
 	if (sdlWin) {
 		SDL_DestroyWindow(sdlWin);
+	}*/
+	if (screen)
+	{
+		SDL_FreeSurface(screen);
 	}
-	if (sdlPixFmt) {
+	if (sdlTex)
+	{
+		SDL_FreeSurface(sdlTex);
+	}
+	/*if (sdlPixFmt) {
 		SDL_FreeFormat(sdlPixFmt);
 	}
 	if (sdlTex) {
 		SDL_DestroyTexture(sdlTex);
-	}
+	}*/
 	SDL_Quit();
 }
 
@@ -141,16 +159,18 @@ void checkmem() {
 }
 
 void GFX_ToggleFullScreen() {
+	/*
 #ifndef __ANDROID__
 	bool fullNow = (SDL_GetWindowFlags(sdlWin) & SDL_WINDOW_FULLSCREEN_DESKTOP) != 0;
 	SDL_SetWindowFullscreen(sdlWin, fullNow ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
-#endif
+#endif*/
 }
 
 void GFX_SetFullScreen(bool fullscreen) {
+	/*
 #ifndef __ANDROID__
 	SDL_SetWindowFullscreen(sdlWin, fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
-#endif
+#endif*/
 }
 
 pixel_t GFX_GetPixel(uint8_t r, uint8_t g, uint8_t b) {
@@ -161,13 +181,15 @@ void GFX_CreateBackBuffer(int x, int y) {
 	TraceFunction();
 	GFX_SetBackBufferSize(x, y);
 
-	sdlTex = SDL_CreateTexture(sdlRen, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING,
+	/*sdlTex = SDL_CreateTexture(sdlRen, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING,
 	                           config::MAX_SCREEN_WIDTH, config::MAX_SCREEN_HEIGHT);
 	if (sdlTex == nullptr) {
 		throw_error("SDL_CreateTexture Error: ");
-	}
-
-	sdlPixFmt = SDL_AllocFormat(SDL_PIXELFORMAT_RGB565);
+	}*/
+	
+	sdlTex = SDL_CreateRGBSurface(SDL_HWSURFACE, 128, 128, 16, 0,0,0,0);
+	sdlPixFmt = sdlTex->format;
+	//sdlPixFmt = SDL_AllocFormat(SDL_PIXELFORMAT_RGB565);
 
 	GFX_SelectPalette("pico8");
 }
@@ -221,16 +243,17 @@ void GFX_SetPaletteRGBIndex(uint8_t i, uint8_t r, uint8_t g, uint8_t b) {
 }
 
 void GFX_CopyBackBuffer(uint8_t* buffer, int buffer_w, int buffer_h) {
-	pixel_t* pixels;
+	pixel_t* pixels = (pixel_t*) sdlTex->pixels;
 	int pitch;
 
 	SDL_Rect r = {0, 0, buffer_w, buffer_h};
-
-	int res = SDL_LockTexture(sdlTex, &r, (void**)&pixels, &pitch);
-	if (res < 0) {
+	pitch = sdlTex->pitch;
+	
+	//int res = SDL_LockTexture(sdlTex, &r, (void**)&pixels, &pitch);
+	/*/if (res < 0) {
 		throw_error("SDL_LockTexture Error: ");
-	}
-
+	}*/
+	SDL_LockSurface(sdlTex);
 	for (int y = 0; y < buffer_h; y++) {
 		for (int x = 0; x < buffer_w; x++) {
 			pixels[x] = palette[buffer[x]];
@@ -240,8 +263,9 @@ void GFX_CopyBackBuffer(uint8_t* buffer, int buffer_w, int buffer_h) {
 		pixels += pitch / sizeof(pixel_t);
 		buffer += buffer_w;
 	}
+	SDL_UnlockSurface(sdlTex);
 
-	SDL_UnlockTexture(sdlTex);
+	//SDL_UnlockTexture(sdlTex);
 }
 
 void GFX_ShowHWMouse(bool show) {
@@ -249,21 +273,22 @@ void GFX_ShowHWMouse(bool show) {
 }
 
 void GFX_GetDisplayArea(int* w, int* h) {
-	SDL_GetRendererOutputSize(sdlRen, w, h);
+	//SDL_GetRendererOutputSize(sdlRen, w, h);
 }
 
 void GFX_SetZoom(int x, int y, double factor, double rot) {
-	zoom_origin.x = x;
+	/*zoom_origin.x = x;
 	zoom_origin.y = y;
 	zoom_factor = factor;
-	zoom_rot = rot;
+	zoom_rot = rot;*/
 }
 
+/*
 static SDL_Rect getDisplayArea(SDL_Window* win, double* scale = nullptr) {
 	int winx, winy;
 	SDL_GetWindowSize(win, &winx, &winy);
 
-	SDL_Rect r = {0, 0, winx, winy};
+	SDL_Rect r = {0, 0, 128, 128};
 	double xscale = (double)winx / (double)screenWidth;
 	double yscale = (double)winy / (double)screenHeight;
 
@@ -280,9 +305,10 @@ static SDL_Rect getDisplayArea(SDL_Window* win, double* scale = nullptr) {
 	}
 	return r;
 }
+*/
 
 void GFX_Flip() {
-	SDL_Rect dr = getDisplayArea(sdlWin);
+	/*SDL_Rect dr = getDisplayArea(sdlWin);
 	SDL_Rect sr = {0, 0, screenWidth, screenHeight};
 
 	SDL_RenderClear(sdlRen);
@@ -300,7 +326,13 @@ void GFX_Flip() {
 	               int(zoom_origin.y * scaley * zoom_factor)};
 
 	SDL_RenderCopyEx(sdlRen, sdlTex, &sr, &dr, zoom_rot, &c, SDL_FLIP_NONE);
-	SDL_RenderPresent(sdlRen);
+	SDL_RenderPresent(sdlRen);*/
+#ifdef IPU_SCALING
+	SDL_BlitSurface(sdlTex, NULL, screen, NULL);
+#else
+	SDL_SoftStretch(sdlTex, NULL, screen, NULL);
+#endif
+	SDL_Flip(screen);
 }
 
 static uint8_t keyState = 0;
@@ -322,29 +354,31 @@ static inline void set_state_bit(uint8_t& state, uint8_t bit, bool condition, bo
 static std::array<TouchInfo, 8> touchState;
 
 bool INP_TouchAvailable() {
-	return SDL_GetNumTouchDevices() > 0;
+	//return SDL_GetNumTouchDevices() > 0;
+	return 0;
 }
 
 uint8_t INP_GetTouchMask() {
 	uint8_t mask = 0;
-	for (size_t n = 0; n < touchState.size(); n++) {
+	/*for (size_t n = 0; n < touchState.size(); n++) {
 		if (touchState[n].state != TouchInfo::None) {
 			mask |= (1 << n);
 		}
-	}
+	}*/
 	return mask;
 }
 
 TouchInfo INP_GetTouchInfo(int idx) {
-	if (idx < 0 && idx >= (int)touchState.size()) {
+	/*if (idx < 0 && idx >= (int)touchState.size()) {
 		return TouchInfo{};
 	} else {
 		return touchState[idx];
-	}
+	}*/
+	return TouchInfo{};
 }
 
 static void flushTouchEvents() {
-	for (TouchInfo& t : touchState) {
+	/*for (TouchInfo& t : touchState) {
 		if (t.state & TouchInfo::JustPressed) {
 			t.state &= (~TouchInfo::JustPressed);
 		}
@@ -352,12 +386,12 @@ static void flushTouchEvents() {
 		if (t.state & TouchInfo::JustReleased) {
 			t.state = TouchInfo::None;
 		}
-	}
+	}*/
 }
 
 static void scaleMouse(int& x, int& y);
 
-static void processTouchEvent(const SDL_TouchFingerEvent& ev) {
+/*static void processTouchEvent(const SDL_TouchFingerEvent& ev) {
 	if (ev.fingerId < (int)touchState.size()) {
 		TouchInfo& ti = touchState[(int)ev.fingerId];
 
@@ -382,6 +416,7 @@ static void processTouchEvent(const SDL_TouchFingerEvent& ev) {
 	// logr << "touch: x=" << ev.x << " y=" << ev.y << " fid=" << ev.fingerId << " tid=" <<
 	// ev.touchId;
 }
+*/
 
 static std::deque<std::string> keypresses;
 static void addKeyPress(const std::string& k) {
@@ -392,11 +427,6 @@ static void addKeyPress(const std::string& k) {
 }
 
 std::string INP_GetKeyPress() {
-	if (!SDL_IsTextInputActive()) {
-#ifndef __ANDROID__
-		SDL_StartTextInput();
-#endif
-	}
 	if (keypresses.size() == 0) {
 		return "";
 	}
@@ -406,11 +436,8 @@ std::string INP_GetKeyPress() {
 }
 
 bool INP_ProcessInputEvents(const SDL_Event& ev) {
-	if (SDL_IsTextInputActive()) {
-		if (ev.type == SDL_TEXTINPUT) {
-			// logr << ev.text.text;
-			addKeyPress(ev.text.text);
-		}
+	/*if (SDL_IsTextInputActive())
+	{
 		if (ev.type == SDL_KEYDOWN) {
 			if (ev.key.keysym.sym < 32 || ev.key.keysym.sym >= 127) {
 				// logr << ev.key.keysym.sym << " " << SDL_GetKeyName(ev.key.keysym.sym);
@@ -422,7 +449,7 @@ bool INP_ProcessInputEvents(const SDL_Event& ev) {
 				addKeyPress(k);
 			}
 		}
-	}
+	}*/
 	if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_F11) {
 		GFX_ToggleFullScreen();
 		return true;
@@ -443,13 +470,19 @@ bool INP_ProcessInputEvents(const SDL_Event& ev) {
 		set_state_bit(keyState, 1, ev.key.keysym.sym == SDLK_RIGHT, ev.type == SDL_KEYDOWN);
 		set_state_bit(keyState, 2, ev.key.keysym.sym == SDLK_UP, ev.type == SDL_KEYDOWN);
 		set_state_bit(keyState, 3, ev.key.keysym.sym == SDLK_DOWN, ev.type == SDL_KEYDOWN);
+#ifdef PC_KEYBOARD_LAYOUT
 		set_state_bit(keyState, 4, ev.key.keysym.sym == SDLK_z, ev.type == SDL_KEYDOWN);
 		set_state_bit(keyState, 5, ev.key.keysym.sym == SDLK_x, ev.type == SDL_KEYDOWN);
 		set_state_bit(keyState, 6, ev.key.keysym.sym == SDLK_p, ev.type == SDL_KEYDOWN);
+#else
+		set_state_bit(keyState, 4, ev.key.keysym.sym == SDLK_LCTRL, ev.type == SDL_KEYDOWN);
+		set_state_bit(keyState, 5, ev.key.keysym.sym == SDLK_LALT, ev.type == SDL_KEYDOWN);
+		set_state_bit(keyState, 6, ev.key.keysym.sym == SDLK_LSHIFT, ev.type == SDL_KEYDOWN);
+#endif
 		set_state_bit(keyState, 6, ev.key.keysym.sym == SDLK_RETURN, ev.type == SDL_KEYDOWN);
 		set_state_bit(keyState, 7, ev.key.keysym.sym == SDLK_ESCAPE, ev.type == SDL_KEYDOWN);
-	} else if (ev.type == SDL_MOUSEWHEEL) {
-		mouseWheel += ev.wheel.y;
+	/*} else if (ev.type == SDL_MOUSEWHEEL) {
+		mouseWheel += ev.wheel.y;*/
 	} else if (ev.type == SDL_JOYAXISMOTION) {
 		// logr << "axis: " << (int)ev.jaxis.axis << "=" << ev.jaxis.value;
 		set_state_bit(joyState, 0, ev.jaxis.axis == 0, ev.jaxis.value < -10000);
@@ -469,10 +502,10 @@ bool INP_ProcessInputEvents(const SDL_Event& ev) {
 		set_state_bit(joyState, 4, ev.jbutton.button == 1, (bool)ev.jbutton.state);
 		set_state_bit(joyState, 5, ev.jbutton.button == 0, (bool)ev.jbutton.state);
 		set_state_bit(joyState, 6, ev.jbutton.button == 7, (bool)ev.jbutton.state);
-	} else if (ev.type == SDL_FINGERDOWN || ev.type == SDL_FINGERMOTION ||
+	}/* else if (ev.type == SDL_FINGERDOWN || ev.type == SDL_FINGERMOTION ||
 	           ev.type == SDL_FINGERUP) {
 		processTouchEvent(ev.tfinger);
-	}
+	}*/
 	return true;
 }
 
@@ -507,17 +540,20 @@ uint32_t TIME_GetElapsedTime_ms(uint32_t start) {
 }
 
 uint64_t TIME_GetProfileTime() {
-	return SDL_GetPerformanceCounter();
+	//return SDL_GetPerformanceCounter();
+	return 0;
 }
 
 uint64_t TIME_GetElapsedProfileTime_us(uint64_t start) {
-	uint64_t now = SDL_GetPerformanceCounter();
-	return ((now - start) * 1000000) / SDL_GetPerformanceFrequency();
+	/*uint64_t now = SDL_GetPerformanceCounter();
+	return ((now - start) * 1000000) / SDL_GetPerformanceFrequency();*/
+	return 0;
 }
 
 uint64_t TIME_GetElapsedProfileTime_ms(uint64_t start) {
-	uint64_t now = SDL_GetPerformanceCounter();
-	return ((now - start) * 1000) / SDL_GetPerformanceFrequency();
+	/*uint64_t now = SDL_GetPerformanceCounter();
+	return ((now - start) * 1000) / SDL_GetPerformanceFrequency();*/
+	return 0;
 }
 
 void TIME_Sleep(int ms) {
@@ -525,12 +561,12 @@ void TIME_Sleep(int ms) {
 }
 
 static void scaleMouse(int& x, int& y) {
-	double scale;
+	/*double scale;
 	SDL_Rect r = getDisplayArea(sdlWin, &scale);
 	x -= r.x;
 	y -= r.y;
 	x = (int)(x / scale);
-	y = (int)(y / scale);
+	y = (int)(y / scale);*/
 }
 
 MouseState INP_GetMouseState() {
@@ -549,7 +585,7 @@ MouseState INP_GetMouseState() {
 }
 
 std::string FILE_LoadFile(std::string name) {
-	logr << "loading file: " << name;
+	/*logr << "loading file: " << name;
 	std::string data;
 	SDL_RWops* file = SDL_RWFromFile(name.c_str(), "r");
 	if (file) {
@@ -562,14 +598,44 @@ std::string FILE_LoadFile(std::string name) {
 			SDL_RWclose(file);
 		}
 	}
+	decrypt(data);*/
+	
+	logr << "loading file: " << name;
+	FILE* fp;
+	char* data_cart;
+	//std::string data;
+	//SDL_RWops* file = SDL_RWFromFile(name.c_str(), "r");
+	fp = fopen(name.c_str(), "rb");
+	if (fp) {
+		fseek(fp, 0 , SEEK_END);
+		size_t sz = ftell(fp);
+		fseek(fp, 0 , SEEK_SET);// needed for next read from beginning of file
+		//size_t sz = (size_t)SDL_RWsize(file);
+		if (sz) {
+			//data.resize(sz, ' ');
+			data_cart = (char*)malloc(sz);
+			//SDL_RWread(file, &data[0], sz, 1);
+			fread(data_cart, sz, 1, fp);
+			logr << "  " << sz << " bytes loaded";
+
+			//SDL_RWclose(file);
+			fclose(fp);
+		}
+	}
+	std::string data(data_cart);
 	decrypt(data);
+	
 	return data;
 }
 
 std::string FILE_LoadGameState(std::string name) {
-	const char* path = SDL_GetPrefPath("0xcafed00d", "tac08");
+	//const char* path = SDL_GetPrefPath("0xcafed00d", "tac08");
+	
+	char path[512];
+	snprintf(path, sizeof(path), "%/.config/tac08/%s", getenv("HOME"), "0xcafed00d");
+	
 	name = std::string(path) + name;
-	SDL_free((void*)path);
+	//SDL_free((void*)path);
 
 	return FILE_LoadFile(name);
 }
@@ -577,9 +643,12 @@ std::string FILE_LoadGameState(std::string name) {
 void FILE_SaveGameState(std::string name, std::string data) {
 	encrypt(data);
 
-	const char* path = SDL_GetPrefPath("0xcafed00d", "tac08");
+	/*const char* path = SDL_GetPrefPath("0xcafed00d", "tac08");
 	name = std::string(path) + name;
-	SDL_free((void*)path);
+	SDL_free((void*)path);*/
+	char path[512];
+	snprintf(path, sizeof(path), "%/.config/tac08/%s", getenv("HOME"), "0xcafed00d");
+	name = std::string(path) + name;
 
 	logr << "writing file: " << name << " bytes: " << data.length();
 
@@ -593,22 +662,23 @@ void FILE_SaveGameState(std::string name, std::string data) {
 
 std::string FILE_ReadClip() {
 	std::string res;
-	if (SDL_HasClipboardText()) {
+	/*if (SDL_HasClipboardText()) {
 		auto t = SDL_GetClipboardText();
 		if (t) {
 			res = t;
 			SDL_free(t);
 		}
-	}
+	}*/
 	return res;
 }
 
 void FILE_WriteClip(const std::string& data) {
-	SDL_SetClipboardText(data.c_str());
+	//SDL_SetClipboardText(data.c_str());
 }
 
 std::string FILE_GetDefaultCartName() {
-	const char* val = SDL_GetHint("TAC08_DEFAULT_CART_NAME");
+	//const char* val = SDL_GetHint("TAC08_DEFAULT_CART_NAME");
+	char* val = getenv("TAC08_DEFAULT_CART_NAME");
 	if (val == nullptr) {
 		return "cart.p8";
 	}
@@ -652,6 +722,7 @@ uint32_t HAL_GetFrameRate(char fps_type) {
 }
 
 void PLATFORM_OpenURL(std::string url) {
+/*
 #ifdef __ANDROID__
 	JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
 	jobject activity = (jobject)SDL_AndroidGetActivity();
@@ -668,6 +739,7 @@ void PLATFORM_OpenURL(std::string url) {
 	env->DeleteLocalRef(activity);
 	env->DeleteLocalRef(clazz);
 #endif
+*/
 }
 
 bool DEBUG_Trace() {
